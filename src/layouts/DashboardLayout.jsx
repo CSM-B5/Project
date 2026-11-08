@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -44,6 +45,53 @@ const menus = {
   ]
 };
 
+// Individual medical color themes
+const roleThemes = {
+  admin: {
+    sidebar: 'bg-slate-700',
+    active: 'bg-slate-500',
+    logo: 'text-slate-200',
+    page: 'bg-slate-50',
+    accent: 'text-slate-600',
+    label: 'text-slate-300',
+    border: 'border-slate-600',
+    hover: 'hover:bg-slate-600'
+  },
+
+  doctor: {
+    sidebar: 'bg-blue-900',
+    active: 'bg-blue-500',
+    logo: 'text-blue-200',
+    page: 'bg-blue-50',
+    accent: 'text-blue-700',
+    label: 'text-blue-200',
+    border: 'border-blue-800',
+    hover: 'hover:bg-blue-800'
+  },
+
+  radiologist: {
+    sidebar: 'bg-teal-900',
+    active: 'bg-teal-600',
+    logo: 'text-teal-200',
+    page: 'bg-teal-50',
+    accent: 'text-teal-700',
+    label: 'text-teal-200',
+    border: 'border-teal-800',
+    hover: 'hover:bg-teal-800'
+  },
+
+  patient: {
+    sidebar: 'bg-purple-900',
+    active: 'bg-purple-600',
+    logo: 'text-purple-200',
+    page: 'bg-purple-50',
+    accent: 'text-purple-700',
+    label: 'text-purple-200',
+    border: 'border-purple-800',
+    hover: 'hover:bg-purple-800'
+  }
+};
+
 function DashboardLayout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -55,37 +103,45 @@ function DashboardLayout({ children }) {
     patient: 'Patient'
   };
 
+  const theme = roleThemes[user.role];
+  console.log("ROLE:", user.role);
+console.log("THEME:", roleThemes[user.role]);
+  const roleMenu = menus[user.role] || [];
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
+    <div className={`flex min-h-screen ${theme.page}`}>
 
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-950 text-white flex flex-col shrink-0">
+      <aside className={`w-64 ${theme.sidebar} text-white flex flex-col shrink-0`}>
 
-        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
-          <Brain className="text-teal-400 w-8 h-8" />
+        {/* Logo */}
+        <div className={`p-6 flex items-center gap-3 border-b ${theme.border}`}>
+          <Brain className={`${theme.logo} w-8 h-8`} />
 
           <div>
             <h1 className="font-bold text-xl">NeuroAI</h1>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-white/60">
               Medical Imaging Platform
             </p>
           </div>
         </div>
 
+        {/* Workspace name */}
         <div className="px-5 py-5">
-          <p className="text-xs uppercase tracking-wider text-slate-500">
+          <p className={`text-xs uppercase tracking-wider ${theme.label}`}>
             {roleNames[user.role]} Workspace
           </p>
         </div>
 
+        {/* Navigation */}
         <nav className="flex-1 px-3 space-y-2">
 
-          {menus[user.role].map((item) => {
+          {roleMenu.map((item) => {
             const Icon = item.icon;
 
             return item.active ? (
@@ -93,7 +149,7 @@ function DashboardLayout({ children }) {
                 key={item.name}
                 to={`/${user.role}`}
                 end
-                className="flex items-center gap-3 p-3 rounded-lg bg-teal-600 text-white"
+                className={`flex items-center gap-3 p-3 rounded-lg ${theme.active} text-white shadow-sm`}
               >
                 <Icon size={19} />
                 {item.name}
@@ -102,7 +158,7 @@ function DashboardLayout({ children }) {
               <div
                 key={item.name}
                 title="This section will be implemented next"
-                className="flex items-center gap-3 p-3 rounded-lg text-slate-400 opacity-60 cursor-not-allowed"
+                className={`flex items-center gap-3 p-3 rounded-lg text-white/60 opacity-70 cursor-not-allowed ${theme.hover}`}
               >
                 <Icon size={19} />
                 {item.name}
@@ -112,19 +168,20 @@ function DashboardLayout({ children }) {
 
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
+        {/* User information and logout */}
+        <div className={`p-4 border-t ${theme.border}`}>
 
           <p className="text-sm text-white truncate">
             {user.email}
           </p>
 
-          <p className="text-xs text-slate-400 mb-4">
+          <p className="text-xs text-white/60 mb-4">
             {roleNames[user.role]}
           </p>
 
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 text-red-400 hover:text-red-300"
+            className="flex items-center gap-3 text-red-300 hover:text-red-200 transition-colors"
           >
             <LogOut size={18} />
             Logout
@@ -139,7 +196,7 @@ function DashboardLayout({ children }) {
 
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 md:px-8">
 
-          <h2 className="font-semibold text-slate-800">
+          <h2 className={`font-semibold ${theme.accent}`}>
             {roleNames[user.role]} Dashboard
           </h2>
 
