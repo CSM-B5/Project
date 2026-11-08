@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.vscode/
+.idea/
+*.egg-info/
+.DS_Store
+
+# runtime data (database, uploaded scans, secret key) — never commit
+storage/*
+!storage/.gitkeep
+*.db
+
+# trained model weights
+weights/*.pt
+weights/*.pth
+weights/*.onnx
