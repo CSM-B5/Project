@@ -1,28 +1,23 @@
-"""Segmentation service.
+"""Tumour segmentation service.
 
 !!! PLACEHOLDER MODEL !!!
-`MockSegmenter` thresholds the brightest areas inside the central (lung) field
-and labels connected blobs. It exists so the overlay feature works end-to-end.
-Replace with Swin UNETR / nnU-Net / SegResMamba / a promptable VLSM
-(see the PDFs in the repo) by implementing the same `segment()` signature.
+`MockSegmenter` thresholds the brightest pixels in the central brain area and
+labels connected blobs. Replace with U-Net++ (or any model) by implementing
+the same `segment()` signature and returning it from `get_segmenter()`.
 """
-import base64
-import io
 from collections import deque
+from dataclasses import dataclass
 from functools import lru_cache
 
 import numpy as np
-from PIL import Image
-
-OVERLAY_RGB = (244, 63, 94)  # #f43f5e
-OVERLAY_HEX = "#f43f5e"
-MAX_SIDE = 512
+from PIL import Image, ImageFilter
 
 
+@dataclass
 class SegmentationResult:
-    def __init__(self, mask: np.ndarray, regions: int):
-        self.mask = mask  # bool array (H, W) at mask resolution
-        self.regions = regions
+    mask: np.ndarray  # bool (H, W) at working resolution
+    regions: int
+    area_percent: float
 
 
 def _count_regions(mask: np.ndarray, min_area: int = 12) -> int:
@@ -47,31 +42,22 @@ def _count_regions(mask: np.ndarray, min_area: int = 12) -> int:
 
 
 class MockSegmenter:
-    def segment(self, image: Image.Image) -> SegmentationResult:
-        small = image.convert("L").resize((128, 128))
+    SIZE = 128
+
+    def segment(self, image: Image.Image, tumor_expected: bool = True) -> SegmentationResult:
+        n = self.SIZE
+        if not tumor_expected:  # classifier said "No Tumor" -> nothing to outline
+            return SegmentationResult(np.zeros((n, n), dtype=bool), 0, 0.0)
+        small = image.convert("L").resize((n, n)).filter(ImageFilter.GaussianBlur(2))  # smooth -> coherent blobs
         g = np.asarray(small, dtype="float32")
         field = np.zeros_like(g, dtype=bool)
-        field[24:104, 20:108] = True  # rough lung field
-        vals = g[field]
-        thr = np.percentile(vals, 92)
-        mask = (g >= thr) & field
-        return SegmentationResult(mask, _count_regions(mask))
-
-    @staticmethod
-    def to_overlay_data_url(result: SegmentationResult, size: tuple[int, int]) -> str:
-        """Transparent RGBA PNG with the mask in the overlay colour."""
-        w, h = size
-        scale = min(1.0, MAX_SIDE / max(w, h))
-        out_size = (max(1, int(w * scale)), max(1, int(h * scale)))
-        m = Image.fromarray((result.mask * 255).astype("uint8")).resize(
-            out_size, Image.NEAREST
-        )
-        m = np.asarray(m) > 0
-        rgba = np.zeros((out_size[1], out_size[0], 4), dtype="uint8")
-        rgba[m] = (*OVERLAY_RGB, 120)
-        buf = io.BytesIO()
-        Image.fromarray(rgba, "RGBA").save(buf, format="PNG")
-        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+        field[20:108, 20:108] = True  # central brain area
+        thr = np.percentile(g[field], 93)
+        mask = (g > thr) & field
+        regions = _count_regions(mask)
+        if regions == 0:
+            mask = np.zeros_like(mask)
+        return SegmentationResult(mask, regions, round(float(mask.mean() * 100), 2))
 
 
 @lru_cache

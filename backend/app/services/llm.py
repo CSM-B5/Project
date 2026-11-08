@@ -1,74 +1,67 @@
-"""Chat / report generation.
+"""Report drafting and chat.
 
-LLM_PROVIDER=mock       -> rule-based reply built from the analysis (no key needed)
-LLM_PROVIDER=anthropic  -> Claude via the Anthropic Messages API
+LLM_PROVIDER=mock       -> rule-based text built from the findings (no key needed)
+LLM_PROVIDER=anthropic  -> Claude via the Anthropic Messages API (chat only)
 """
 import httpx
 from fastapi import HTTPException
 
 from app.config import get_settings
-from app.schemas import AnalysisResponse, ChatTurn
+from app.models import Study
+from app.schemas import ChatTurn
+from app.services.classifier import NO_TUMOR
 
 SYSTEM_PROMPT = (
-    "You are a clinical-imaging assistant inside a radiology research prototype. "
-    "You help a clinician interpret AI model outputs for a medical scan and draft "
-    "report text. Base statements only on the provided findings; if something is "
-    "not in the findings, say so. Be concise and professional. Always note that "
-    "outputs are model-generated and require clinician verification."
+    "You are a clinical-imaging assistant inside a brain-MRI research prototype. "
+    "You help clinicians interpret AI model outputs and draft report text. Base "
+    "statements only on the provided findings; if something is not in the findings, "
+    "say so. Be concise and professional. Always note that outputs are "
+    "model-generated and require clinician verification."
 )
 
 
-def findings_text(case: AnalysisResponse | None) -> str:
-    if case is None:
-        return "No scan has been analysed in this session yet."
-    c, s = case.classification, case.segmentation
+def findings_text(study: Study | None) -> str:
+    if study is None:
+        return "No scan has been selected in this conversation."
+    probs = ", ".join(f"{k} {v}%" for k, v in sorted(study.probabilities.items(), key=lambda kv: -kv[1]))
     return (
-        f"Case {case.caseId} ({case.patientInfo.scanType}). "
-        f"Primary finding: {c.primaryLabel} ({c.confidenceScore}% confidence) in the "
-        f"{c.anatomicalTarget}. Secondary: {c.secondaryLabel} ({c.secondaryScore}%). "
-        f"Segmentation detected {s.detectedRegionsCount} region(s)."
+        f"Brain MRI study #{study.id}. Predicted class: {study.predicted_class} "
+        f"(probabilities: {probs}). Segmentation: {study.seg_status}, "
+        f"{study.seg_regions} region(s), tumour area {study.tumor_area_percent}% of the slice."
     )
 
 
-def initial_summary(case: AnalysisResponse) -> str:
-    c, s = case.classification, case.segmentation
+def draft_report(predicted_class: str, probabilities: dict[str, float], regions: int, area: float | None) -> str:
+    p = probabilities.get(predicted_class, 0)
+    if predicted_class == NO_TUMOR:
+        return (
+            f"AI-assisted draft: the model finds no features of a brain tumour in this MRI "
+            f"slice (No Tumor, {p}% probability). No tumour region was segmented. "
+            "This draft requires review and approval by the responsible doctor."
+        )
     return (
-        f"Multimodal analysis suggests findings most consistent with {c.primaryLabel} "
-        f"({c.confidenceScore}% model confidence) involving the {c.anatomicalTarget}; "
-        f"{s.detectedRegionsCount} candidate region(s) were segmented. "
-        "Recommend clinical correlation and radiologist review."
+        f"AI-assisted draft: the model suggests findings most consistent with {predicted_class} "
+        f"({p}% probability). Segmentation outlined {regions} candidate region(s) covering about "
+        f"{area}% of the slice. Clinical correlation and specialist review are recommended. "
+        "This draft requires review and approval by the responsible doctor."
     )
 
 
-def _mock_reply(message: str, case: AnalysisResponse | None) -> str:
-    if case is None:
-        return "Please upload a patient scan first so I can discuss its findings."
-    c = case.classification
+def _mock_reply(message: str, study: Study | None) -> str:
+    if study is None:
+        return "Please select or upload a scan first so I can discuss its findings."
     m = message.lower()
     if "report" in m or "draft" in m:
-        return (
-            f"DRAFT REPORT — {case.caseId}\n"
-            f"Technique: {case.patientInfo.scanType}.\n"
-            f"Findings: AI analysis indicates {c.primaryLabel} in the {c.anatomicalTarget} "
-            f"(confidence {c.confidenceScore}%). {case.segmentation.detectedRegionsCount} "
-            "region(s) flagged by segmentation.\n"
-            f"Impression: Findings suggestive of {c.primaryLabel}; clinical correlation advised.\n"
-            "Note: model-generated draft, requires clinician verification."
-        )
-    if "confiden" in m or "sure" in m:
-        return (
-            f"The model assigns {c.confidenceScore}% to {c.primaryLabel} versus "
-            f"{c.secondaryScore}% to {c.secondaryLabel}. Treat as decision support only."
-        )
-    return findings_text(case) + " Ask me to draft a report or explain any finding."
+        return f"DRAFT REPORT\n{study.report_summary}\nNote: model-generated, requires clinician verification."
+    if "confiden" in m or "sure" in m or "probab" in m:
+        return findings_text(study) + " Treat these numbers as decision support only."
+    return findings_text(study) + " Ask me to draft a report or explain any finding."
 
 
-async def generate_reply(
-    message: str, case: AnalysisResponse | None, history: list[ChatTurn]
-) -> str:
+async def generate_reply(message: str, study: Study | None, history: list[ChatTurn]) -> str:
     s = get_settings()
     if s.llm_provider == "mock":
-        return _mock_reply(message, case)
+        return _mock_reply(message, study)
 
     if s.llm_provider == "anthropic":
         if not s.anthropic_api_key:
@@ -78,8 +71,7 @@ async def generate_reply(
             for t in history
             if t.text.strip()
         ]
-        # API requires the conversation to start with a user turn
-        while msgs and msgs[0]["role"] != "user":
+        while msgs and msgs[0]["role"] != "user":  # API needs a user turn first
             msgs.pop(0)
         msgs.append({"role": "user", "content": message})
         try:
@@ -94,7 +86,7 @@ async def generate_reply(
                     json={
                         "model": s.anthropic_model,
                         "max_tokens": 1000,
-                        "system": f"{SYSTEM_PROMPT}\n\nCurrent findings:\n{findings_text(case)}",
+                        "system": f"{SYSTEM_PROMPT}\n\nCurrent findings:\n{findings_text(study)}",
                         "messages": msgs,
                     },
                 )

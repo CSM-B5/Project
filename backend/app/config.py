@@ -6,9 +6,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    app_name: str = "MedVision AI Backend"
+    app_name: str = "NeuroAI Backend"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     max_upload_mb: int = 15
+
+    database_url: str = "sqlite:///./storage/medvision.db"
+    storage_dir: str = "storage"
+
+    secret_key: str = ""
+    access_token_minutes: int = 480
+    allow_patient_registration: bool = True
+
+    admin_email: str = ""
+    admin_password: str = ""
+    seed_demo_users: bool = False
 
     llm_provider: str = "mock"  # "mock" | "anthropic"
     anthropic_api_key: str = ""
