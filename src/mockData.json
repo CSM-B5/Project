@@ -1,0 +1,28 @@
+{
+  "patientInfo": {
+    "caseId": "CASE-001",
+    "name": "Anonymous Patient",
+    "scanType": "Brain MRI"
+  },
+  "classification": {
+    "predictedClass": null,
+    "probabilities": {
+      "Glioma": null,
+      "Meningioma": null,
+      "Pituitary": null,
+      "No Tumor": null
+    }
+  },
+  "segmentation": {
+    "status": "Pending",
+    "originalImage": null,
+    "predictedMask": null,
+    "overlayImage": null,
+    "diceScore": null,
+    "iouScore": null
+  },
+  "report": {
+    "status": "Pending",
+    "summary": null
+  }
+}
