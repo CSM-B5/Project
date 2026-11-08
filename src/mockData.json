@@ -1,20 +1,28 @@
 {
   "patientInfo": {
-    "caseId": "CASE-2026-99X",
+    "caseId": "CASE-001",
     "name": "Anonymous Patient",
-    "scanType": "Chest X-Ray (Anterior-Posterior)"
+    "scanType": "Brain MRI"
   },
   "classification": {
-    "primaryLabel": "Pneumonia",
-    "confidenceScore": 89.4,
-    "secondaryLabel": "Normal Variant",
-    "secondaryScore": 10.6,
-    "anatomicalTarget": "Left Lower Lobe"
+    "predictedClass": null,
+    "probabilities": {
+      "Glioma": null,
+      "Meningioma": null,
+      "Pituitary": null,
+      "No Tumor": null
+    }
   },
   "segmentation": {
-    "maskActive": true,
-    "overlayColor": "#f43f5e",
-    "detectedRegionsCount": 2
+    "status": "Pending",
+    "originalImage": null,
+    "predictedMask": null,
+    "overlayImage": null,
+    "diceScore": null,
+    "iouScore": null
   },
-  "llmInitialSummary": "Multimodal analysis detects structural density alterations in the left lower lung quadrant consistent with focal pneumonia. Recommend targeted clinical correlation."
+  "report": {
+    "status": "Pending",
+    "summary": null
+  }
 }
